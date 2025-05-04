@@ -1,147 +1,128 @@
 import streamlit as st
 import requests
-import socket
 import time
 from datetime import datetime
+import math
 
-# ---------------- 网络连通性检测 ----------------
+st.set_page_config(page_title="加密货币转换器 第8.2版", layout="centered")
+st.title("💱 加密货币转换器 第8.2版")
+
+# 显示网络连接状态
 def check_network():
     try:
-        socket.create_connection(("www.google.com", 80), timeout=5)
+        requests.get("https://www.google.com", timeout=5)
+        st.success("🌐 网络连接正常（可以访问 Google）")
         return True
-    except OSError:
+    except:
+        st.error("❌ 无法连接外网，请检查代理或网络设置。")
         return False
 
-# ---------------- 汇率获取函数 ----------------
-def get_binance_rate():
+# 获取 BTC/USDT 汇率
+@st.cache_data(ttl=60)
+def get_btc_usdt(source):
     try:
-        response = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=10)
-        data = response.json()
-        return float(data["price"])
-    except Exception as e:
-        return f"币安获取失败：{e}"
+        if source == "Binance":
+            url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+            r = requests.get(url).json()
+            return float(r['price'])
+        elif source == "Huobi":
+            url = "https://api.huobi.pro/market/detail/merged?symbol=btcusdt"
+            r = requests.get(url).json()
+            return float(r['tick']['close'])
+    except:
+        return None
 
-def get_huobi_rate():
-    try:
-        response = requests.get("https://api.htx.com/market/detail/merged?symbol=btcusdt", timeout=10)
-        data = response.json()
-        return float(data["tick"]["close"])
-    except Exception as e:
-        return f"火币获取失败：{e}"
-
+# 获取 USD 对 CNY 汇率
+@st.cache_data(ttl=600)
 def get_usd_to_cny():
     try:
-        response = requests.get("https://open.er-api.com/v6/latest/USD", timeout=10)
-        data = response.json()
-        if "rates" in data and "CNY" in data["rates"]:
-            return float(data["rates"]["CNY"])
-        else:
-            return "USD/CNY 获取失败：接口响应不包含 'CNY' 汇率"
-    except Exception as e:
-        return f"USD/CNY 获取失败：{e}"
+        url = "https://open.er-api.com/v6/latest/USD"
+        r = requests.get(url).json()
+        return r['rates']['CNY']
+    except:
+        return None
 
-# ---------------- 汇率刷新 ----------------
-def get_rates():
-    binance = get_binance_rate()
-    huobi = get_huobi_rate()
-    usd_to_cny = get_usd_to_cny()
-    btc_usdt = binance if isinstance(binance, float) else (huobi if isinstance(huobi, float) else None)
-    return binance, huobi, usd_to_cny, btc_usdt
+# 汇率来源选择
+source = st.selectbox("选择汇率平台", ["Binance", "Huobi"])
 
-# ---------------- 页面配置 ----------------
-st.set_page_config(page_title="BTC 汇率转换工具（第9.1版）", layout="centered")
-st.title("📈 BTC 汇率转换工具（第9.1版）")
-
-# 检测网络
-st.subheader("🌐 网络连接测试")
 if check_network():
-    st.success("网络连接正常（可以访问 Google）")
-else:
-    st.error("无法访问 Google，当前网络可能无法连接外网")
+    btc_usdt = get_btc_usdt(source)
+    usd_to_cny = get_usd_to_cny()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# 自动刷新设置
-refresh_interval = st.sidebar.number_input("自动刷新间隔（秒）", min_value=10, max_value=300, value=60, step=10, help="每隔指定秒数自动刷新汇率")
-st.sidebar.write("（手动刷新请点击页面右上角的刷新按钮）")
-
-# 获取汇率
-binance, huobi, usd_to_cny, btc_usdt = get_rates()
-last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-# 显示汇率
-st.subheader("💱 汇率信息")
-col1, col2 = st.columns(2)
-with col1:
-    st.write("### Binance BTC/USDT")
-    st.success(binance if isinstance(binance, float) else str(binance))
-
-with col2:
-    st.write("### Huobi BTC/USDT")
-    st.success(huobi if isinstance(huobi, float) else str(huobi))
-
-st.write("### USD → CNY 汇率")
-if isinstance(usd_to_cny, float):
-    st.success(f"1 USD ≈ {usd_to_cny:.4f} CNY")
-else:
-    st.error(usd_to_cny)
-
-st.caption(f"汇率更新时间：{last_updated}")
-
-# 汇率换算工具
-st.subheader("🔄 汇率换算工具")
-custom1_name = st.text_input("自定义币1名称", "自定义币1")
-custom2_name = st.text_input("自定义币2名称", "自定义币2")
-custom1_price = st.number_input(f"{custom1_name} 单价（SATS）", min_value=0.0, value=1000.0, step=10.0)
-custom2_price = st.number_input(f"{custom2_name} 单价（SATS）", min_value=0.0, value=5000.0, step=10.0)
-
-col_cny, col_usdt, col_btc, col_sats, col_custom1, col_custom2 = st.columns(6)
-with col_cny:
-    cny = st.number_input("CNY（人民币）", value=0.0, key="cny")
-with col_usdt:
-    usdt = st.number_input("USD/T", value=0.0, key="usdt")
-with col_btc:
-    btc = st.number_input("BTC", value=0.0, key="btc")
-with col_sats:
-    sats = st.number_input("SATS（聪）", value=0.0, key="sats")
-with col_custom1:
-    c1 = st.number_input(f"{custom1_name}", value=0.0, key="c1")
-with col_custom2:
-    c2 = st.number_input(f"{custom2_name}", value=0.0, key="c2")
-
-# 自动换算逻辑
-if btc_usdt and isinstance(usd_to_cny, float):
-    total_inputs = [cny, usdt, btc, sats, c1, c2]
-    if any(x > 0 for x in total_inputs):
-        if btc > 0:
-            sats = btc * 1e8
-        elif sats > 0:
-            btc = sats / 1e8
-        elif cny > 0:
-            usdt = cny / usd_to_cny
-            btc = usdt / btc_usdt
-            sats = btc * 1e8
-        elif usdt > 0:
-            btc = usdt / btc_usdt
-            sats = btc * 1e8
-        elif c1 > 0:
-            sats = c1 * custom1_price
-            btc = sats / 1e8
-        elif c2 > 0:
-            sats = c2 * custom2_price
-            btc = sats / 1e8
-
-        usdt = btc * btc_usdt
-        cny = usdt * usd_to_cny
-        c1 = sats / custom1_price if custom1_price else 0
-        c2 = sats / custom2_price if custom2_price else 0
-
-        # 写回所有栏位
-        st.session_state["cny"] = round(cny, 2)
-        st.session_state["usdt"] = round(usdt, 2)
-        st.session_state["btc"] = round(btc, 8)
-        st.session_state["sats"] = round(sats, 0)
-        st.session_state["c1"] = round(c1, 4)
-        st.session_state["c2"] = round(c2, 4)
+    if btc_usdt:
+        st.success(f"{source} BTC/USDT 汇率: {btc_usdt}")
     else:
-        st.info("请在任意一个币种中输入数值以进行换算。")
-else:
-    st.warning("由于 BTC 或 USD/CNY 汇率缺失，无法进行换算。")
+        st.error("❌ 获取 BTC/USDT 汇率失败")
+
+    if usd_to_cny:
+        st.success(f"USD/CNY 汇率: {usd_to_cny:.4f}（{timestamp}）")
+    else:
+        st.error("❌ 获取 USD/CNY 汇率失败")
+
+    # 自动刷新时间（秒）
+    refresh_interval = st.number_input("设置自动刷新时间（秒）", min_value=5, max_value=3600, value=60, step=5)
+    st.markdown("---")
+
+    # 自定义币种名称与单价（SATS）
+    custom_name1 = st.text_input("自定义币种 1 名称", value="自定义币1")
+    custom_price1 = st.number_input(f"{custom_name1} 单价（聪）", min_value=0.0, value=100.0)
+
+    custom_name2 = st.text_input("自定义币种 2 名称", value="自定义币2")
+    custom_price2 = st.number_input(f"{custom_name2} 单价（聪）", min_value=0.0, value=200.0)
+
+    st.markdown("---")
+    st.subheader("输入任意一个币种，自动换算其余")
+
+    cny = st.number_input("CNY（人民币）", min_value=0.0, value=0.0, key="cny")
+    usdt = st.number_input("USD/T（美元/泰达）", min_value=0.0, value=0.0, key="usdt")
+    btc = st.number_input("BTC（比特币）", min_value=0.0, value=0.0, key="btc")
+    sats = st.number_input("SATS（聪）", min_value=0.0, value=0.0, key="sats")
+    c1 = st.number_input(f"{custom_name1}", min_value=0.0, value=0.0, key="c1")
+    c2 = st.number_input(f"{custom_name2}", min_value=0.0, value=0.0, key="c2")
+
+    # 自动换算逻辑
+    if btc_usdt and isinstance(usd_to_cny, float):
+        total_inputs = [cny, usdt, btc, sats, c1, c2]
+        valid_inputs = [x for x in total_inputs if isinstance(x, (int, float)) and not math.isnan(x)]
+
+        if any(x > 0 for x in valid_inputs):
+            if cny > 0:
+                usdt = cny / usd_to_cny
+                btc = usdt / btc_usdt
+            elif usdt > 0:
+                cny = usdt * usd_to_cny
+                btc = usdt / btc_usdt
+            elif btc > 0:
+                usdt = btc * btc_usdt
+                cny = usdt * usd_to_cny
+            elif sats > 0:
+                btc = sats / 100_000_000
+                usdt = btc * btc_usdt
+                cny = usdt * usd_to_cny
+            elif c1 > 0:
+                sats = c1 * custom_price1
+                btc = sats / 100_000_000
+                usdt = btc * btc_usdt
+                cny = usdt * usd_to_cny
+            elif c2 > 0:
+                sats = c2 * custom_price2
+                btc = sats / 100_000_000
+                usdt = btc * btc_usdt
+                cny = usdt * usd_to_cny
+
+            sats = btc * 100_000_000
+            c1 = sats / custom_price1 if custom_price1 > 0 else 0
+            c2 = sats / custom_price2 if custom_price2 > 0 else 0
+
+            # 更新输入框显示结果
+            st.session_state["cny"] = round(cny, 6)
+            st.session_state["usdt"] = round(usdt, 6)
+            st.session_state["btc"] = round(btc, 8)
+            st.session_state["sats"] = round(sats, 2)
+            st.session_state["c1"] = round(c1, 4)
+            st.session_state["c2"] = round(c2, 4)
+
+    # 自动刷新
+    time.sleep(refresh_interval)
+    st.rerun()
