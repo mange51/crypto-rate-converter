@@ -28,6 +28,14 @@ def get_rates_from_okx():
         btc_data = requests.get(btc_url, timeout=10).json()
         usdt_data = requests.get(usdt_url, timeout=10).json()
 
+        # 打印调试信息
+        st.subheader("📦 响应调试信息")
+        st.code(f"BTC 数据:\n{btc_data}")
+        st.code(f"USDT 数据:\n{usdt_data}")
+
+        if "data" not in btc_data or "data" not in usdt_data:
+            raise ValueError("API 返回数据缺失，可能是请求格式错误或API问题。")
+
         btc_usdt = float(btc_data["data"][0]["last"])
         usdt_cny = float(usdt_data["data"][0]["last"])
         btc_cny = btc_usdt * usdt_cny
