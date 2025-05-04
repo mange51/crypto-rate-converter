@@ -1,10 +1,3 @@
-
-try:
-    test = requests.get("https://www.google.com", timeout=5)
-    st.write("网络测试成功 ✅")
-except:
-    st.write("网络测试失败 ❌（Render无法访问外部网络）")
-
 import streamlit as st
 import requests
 import time
@@ -13,6 +6,14 @@ st.set_page_config(page_title="BTC/USDT 汇率", layout="centered")
 
 st.title("📈 BTC 与 USDT 汇率查询")
 st.markdown("数据来源：CoinGecko API（全球可访问）")
+
+# ✅ 网络连接测试
+try:
+    test = requests.get("https://www.google.com", timeout=5)
+    st.success("🌐 网络连接正常（可以访问外网）")
+except:
+    st.error("❌ 无法访问外网，可能是当前平台（如 Render）限制了外部请求")
+    st.stop()
 
 # 自动刷新
 auto_refresh = st.checkbox("每 60 秒自动刷新", value=False)
