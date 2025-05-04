@@ -1,3 +1,10 @@
+
+try:
+    test = requests.get("https://www.google.com", timeout=5)
+    st.write("网络测试成功 ✅")
+except:
+    st.write("网络测试失败 ❌（Render无法访问外部网络）")
+
 import streamlit as st
 import requests
 import time
