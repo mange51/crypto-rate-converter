@@ -4,10 +4,10 @@ import time
 from datetime import datetime
 import math
 
-st.set_page_config(page_title="加密货币转换器 第8.2版", layout="centered")
-st.title("💱 加密货币转换器 第8.2版")
+st.set_page_config(page_title="加密货币转换器 第8.4版", layout="centered")
+st.title("💱 加密货币转换器 第8.4版")
 
-# 显示网络连接状态
+# 检查网络连接
 def check_network():
     try:
         requests.get("https://www.google.com", timeout=5)
@@ -60,68 +60,79 @@ if check_network():
     else:
         st.error("❌ 获取 USD/CNY 汇率失败")
 
-    # 自动刷新时间（秒）
     refresh_interval = st.number_input("设置自动刷新时间（秒）", min_value=5, max_value=3600, value=60, step=5)
     st.markdown("---")
 
-    # 自定义币种名称与单价（SATS）
+    # 自定义币种
     custom_name1 = st.text_input("自定义币种 1 名称", value="自定义币1")
     custom_price1 = st.number_input(f"{custom_name1} 单价（聪）", min_value=0.0, value=100.0)
-
     custom_name2 = st.text_input("自定义币种 2 名称", value="自定义币2")
     custom_price2 = st.number_input(f"{custom_name2} 单价（聪）", min_value=0.0, value=200.0)
 
     st.markdown("---")
     st.subheader("输入任意一个币种，自动换算其余")
 
-    cny = st.number_input("CNY（人民币）", min_value=0.0, value=0.0, key="cny")
-    usdt = st.number_input("USD/T（美元/泰达）", min_value=0.0, value=0.0, key="usdt")
-    btc = st.number_input("BTC（比特币）", min_value=0.0, value=0.0, key="btc")
-    sats = st.number_input("SATS（聪）", min_value=0.0, value=0.0, key="sats")
-    c1 = st.number_input(f"{custom_name1}", min_value=0.0, value=0.0, key="c1")
-    c2 = st.number_input(f"{custom_name2}", min_value=0.0, value=0.0, key="c2")
+    # 初始化输入框
+    input_col = st.columns(6)
+    with input_col[0]:
+        cny_input = st.number_input("CNY（人民币）", min_value=0.0, value=0.0, key="input_cny")
+    with input_col[1]:
+        usdt_input = st.number_input("USD/T（美元/泰达）", min_value=0.0, value=0.0, key="input_usdt")
+    with input_col[2]:
+        btc_input = st.number_input("BTC（比特币）", min_value=0.0, value=0.0, key="input_btc")
+    with input_col[3]:
+        sats_input = st.number_input("SATS（聪）", min_value=0.0, value=0.0, key="input_sats")
+    with input_col[4]:
+        c1_input = st.number_input(f"{custom_name1}", min_value=0.0, value=0.0, key="input_c1")
+    with input_col[5]:
+        c2_input = st.number_input(f"{custom_name2}", min_value=0.0, value=0.0, key="input_c2")
 
-    # 自动换算逻辑
-    if btc_usdt and isinstance(usd_to_cny, float):
-        total_inputs = [cny, usdt, btc, sats, c1, c2]
-        valid_inputs = [x for x in total_inputs if isinstance(x, (int, float)) and not math.isnan(x)]
+    # 换算逻辑
+    cny = usdt = btc = sats = c1 = c2 = 0.0
 
-        if any(x > 0 for x in valid_inputs):
-            if cny > 0:
-                usdt = cny / usd_to_cny
-                btc = usdt / btc_usdt
-            elif usdt > 0:
-                cny = usdt * usd_to_cny
-                btc = usdt / btc_usdt
-            elif btc > 0:
-                usdt = btc * btc_usdt
-                cny = usdt * usd_to_cny
-            elif sats > 0:
-                btc = sats / 100_000_000
-                usdt = btc * btc_usdt
-                cny = usdt * usd_to_cny
-            elif c1 > 0:
-                sats = c1 * custom_price1
-                btc = sats / 100_000_000
-                usdt = btc * btc_usdt
-                cny = usdt * usd_to_cny
-            elif c2 > 0:
-                sats = c2 * custom_price2
-                btc = sats / 100_000_000
-                usdt = btc * btc_usdt
-                cny = usdt * usd_to_cny
+    if btc_usdt and usd_to_cny:
+        if cny_input > 0:
+            cny = cny_input
+            usdt = cny / usd_to_cny
+            btc = usdt / btc_usdt
+        elif usdt_input > 0:
+            usdt = usdt_input
+            btc = usdt / btc_usdt
+            cny = usdt * usd_to_cny
+        elif btc_input > 0:
+            btc = btc_input
+            usdt = btc * btc_usdt
+            cny = usdt * usd_to_cny
+        elif sats_input > 0:
+            sats = sats_input
+            btc = sats / 100_000_000
+            usdt = btc * btc_usdt
+            cny = usdt * usd_to_cny
+        elif c1_input > 0 and custom_price1 > 0:
+            c1 = c1_input
+            sats = c1 * custom_price1
+            btc = sats / 100_000_000
+            usdt = btc * btc_usdt
+            cny = usdt * usd_to_cny
+        elif c2_input > 0 and custom_price2 > 0:
+            c2 = c2_input
+            sats = c2 * custom_price2
+            btc = sats / 100_000_000
+            usdt = btc * btc_usdt
+            cny = usdt * usd_to_cny
 
-            sats = btc * 100_000_000
-            c1 = sats / custom_price1 if custom_price1 > 0 else 0
-            c2 = sats / custom_price2 if custom_price2 > 0 else 0
+        sats = btc * 100_000_000
+        c1 = sats / custom_price1 if custom_price1 > 0 else 0
+        c2 = sats / custom_price2 if custom_price2 > 0 else 0
 
-            # 更新输入框显示结果
-            st.session_state["cny"] = round(cny, 6)
-            st.session_state["usdt"] = round(usdt, 6)
-            st.session_state["btc"] = round(btc, 8)
-            st.session_state["sats"] = round(sats, 2)
-            st.session_state["c1"] = round(c1, 4)
-            st.session_state["c2"] = round(c2, 4)
+        # 输出计算后的结果
+        result_col = st.columns(6)
+        result_col[0].metric("CNY", round(cny, 6))
+        result_col[1].metric("USDT", round(usdt, 6))
+        result_col[2].metric("BTC", round(btc, 8))
+        result_col[3].metric("SATS", round(sats, 2))
+        result_col[4].metric(custom_name1, round(c1, 4))
+        result_col[5].metric(custom_name2, round(c2, 4))
 
     # 自动刷新
     time.sleep(refresh_interval)
