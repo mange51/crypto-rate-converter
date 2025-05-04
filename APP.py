@@ -1,29 +1,26 @@
-import streamlit as st
 import requests
-from decimal import Decimal, getcontext
 
-getcontext().prec = 20
+def get_rate_with_headers():
+    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=cny"
 
-st.set_page_config(page_title="加密货币费率转换器", page_icon="💱")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "zh-CN,zh;q=0.9",
+        "Referer": "https://www.coingecko.com/"
+    }
 
-st.title("加密货币费率转换器")
-
-if st.button("获取汇率"):
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
-        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,tether&vs_currencies=cny"
-        r = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            cny_rate = data["bitcoin"]["cny"]
+            print(f"当前比特币兑人民币汇率：¥{cny_rate}")
+        else:
+            print(f"获取汇率失败，状态码：{response.status_code}\n内容：{response.text}")
+    except requests.RequestException as e:
+        print(f"请求异常：{e}")
 
-        if r.status_code != 200:
-            raise ValueError(f"接口返回错误状态码：{r.status_code}\n内容：{r.text}")
-
-        data = r.json()
-        btc_to_cny = Decimal(str(data["bitcoin"]["cny"]))
-        usdt_to_cny = Decimal(str(data["tether"]["cny"]))
-        btc_to_usdt = btc_to_cny / usdt_to_cny
-        st.success(f"1BTC ≈ {btc_to_usdt:.2f} USDT | 1USDT ≈ {usdt_to_cny:.2f} CNY")
-
-    except Exception as e:
-        st.error(f"获取汇率失败：{e}")
+if __name__ == "__main__":
+    get_rate_with_headers()
