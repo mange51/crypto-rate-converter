@@ -4,9 +4,9 @@ from decimal import Decimal, getcontext
 
 getcontext().prec = 20
 
-st.set_page_config(page_title="加密货币费率转换器", page_icon="💱")
+st.set_page_config(page_title="加密货币费 率转换器", page_icon="💱")
 
-st.title("加密货币费率转换器")
+st.title("加密货币费 率转换器")
 
 # 输入代理地址
 proxy = st.text_input("代理地址 (可选)", "")
