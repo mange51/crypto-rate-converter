@@ -2,10 +2,9 @@ import streamlit as st
 import requests
 import time
 from datetime import datetime
-import math
 
-st.set_page_config(page_title="加密货币转换器 第8.4版", layout="centered")
-st.title("💱 加密货币转换器 第8.4版")
+st.set_page_config(page_title="加密货币转换器 第8.5版", layout="centered")
+st.title("💱 加密货币转换器 第8.5版")
 
 # 检查网络连接
 def check_network():
@@ -72,68 +71,93 @@ if check_network():
     st.markdown("---")
     st.subheader("输入任意一个币种，自动换算其余")
 
-    # 初始化输入框
+    # 初始化 session state
+    keys = ["cny", "usdt", "btc", "sats", "c1", "c2"]
+    for key in keys:
+        if key not in st.session_state:
+            st.session_state[key] = ""
+
+    # 输入框
     input_col = st.columns(6)
-    with input_col[0]:
-        cny_input = st.number_input("CNY（人民币）", min_value=0.0, value=0.0, key="input_cny")
-    with input_col[1]:
-        usdt_input = st.number_input("USD/T（美元/泰达）", min_value=0.0, value=0.0, key="input_usdt")
-    with input_col[2]:
-        btc_input = st.number_input("BTC（比特币）", min_value=0.0, value=0.0, key="input_btc")
-    with input_col[3]:
-        sats_input = st.number_input("SATS（聪）", min_value=0.0, value=0.0, key="input_sats")
-    with input_col[4]:
-        c1_input = st.number_input(f"{custom_name1}", min_value=0.0, value=0.0, key="input_c1")
-    with input_col[5]:
-        c2_input = st.number_input(f"{custom_name2}", min_value=0.0, value=0.0, key="input_c2")
+    cny_input = input_col[0].text_input("CNY（人民币）", value=st.session_state.cny, key="cny")
+    usdt_input = input_col[1].text_input("USD/T（美元/泰达）", value=st.session_state.usdt, key="usdt")
+    btc_input = input_col[2].text_input("BTC（比特币）", value=st.session_state.btc, key="btc")
+    sats_input = input_col[3].text_input("SATS（聪）", value=st.session_state.sats, key="sats")
+    c1_input = input_col[4].text_input(custom_name1, value=st.session_state.c1, key="c1")
+    c2_input = input_col[5].text_input(custom_name2, value=st.session_state.c2, key="c2")
 
-    # 换算逻辑
-    cny = usdt = btc = sats = c1 = c2 = 0.0
+    # 清除 session 中旧值
+    def reset_others(active_key):
+        for key in keys:
+            if key != active_key:
+                st.session_state[key] = ""
 
-    if btc_usdt and usd_to_cny:
-        if cny_input > 0:
-            cny = cny_input
+    # 判断输入来源并计算
+    try:
+        if cny_input:
+            cny = float(cny_input)
             usdt = cny / usd_to_cny
             btc = usdt / btc_usdt
-        elif usdt_input > 0:
-            usdt = usdt_input
+            sats = btc * 100_000_000
+            c1 = sats / custom_price1 if custom_price1 > 0 else 0
+            c2 = sats / custom_price2 if custom_price2 > 0 else 0
+            reset_others("cny")
+
+        elif usdt_input:
+            usdt = float(usdt_input)
             btc = usdt / btc_usdt
             cny = usdt * usd_to_cny
-        elif btc_input > 0:
-            btc = btc_input
+            sats = btc * 100_000_000
+            c1 = sats / custom_price1 if custom_price1 > 0 else 0
+            c2 = sats / custom_price2 if custom_price2 > 0 else 0
+            reset_others("usdt")
+
+        elif btc_input:
+            btc = float(btc_input)
             usdt = btc * btc_usdt
             cny = usdt * usd_to_cny
-        elif sats_input > 0:
-            sats = sats_input
+            sats = btc * 100_000_000
+            c1 = sats / custom_price1 if custom_price1 > 0 else 0
+            c2 = sats / custom_price2 if custom_price2 > 0 else 0
+            reset_others("btc")
+
+        elif sats_input:
+            sats = float(sats_input)
             btc = sats / 100_000_000
             usdt = btc * btc_usdt
             cny = usdt * usd_to_cny
-        elif c1_input > 0 and custom_price1 > 0:
-            c1 = c1_input
+            c1 = sats / custom_price1 if custom_price1 > 0 else 0
+            c2 = sats / custom_price2 if custom_price2 > 0 else 0
+            reset_others("sats")
+
+        elif c1_input:
+            c1 = float(c1_input)
             sats = c1 * custom_price1
             btc = sats / 100_000_000
             usdt = btc * btc_usdt
             cny = usdt * usd_to_cny
-        elif c2_input > 0 and custom_price2 > 0:
-            c2 = c2_input
+            c2 = sats / custom_price2 if custom_price2 > 0 else 0
+            reset_others("c1")
+
+        elif c2_input:
+            c2 = float(c2_input)
             sats = c2 * custom_price2
             btc = sats / 100_000_000
             usdt = btc * btc_usdt
             cny = usdt * usd_to_cny
+            c1 = sats / custom_price1 if custom_price1 > 0 else 0
+            reset_others("c2")
 
-        sats = btc * 100_000_000
-        c1 = sats / custom_price1 if custom_price1 > 0 else 0
-        c2 = sats / custom_price2 if custom_price2 > 0 else 0
+        # 更新 session state 显示结果
+        st.session_state.cny = f"{cny:.6f}"
+        st.session_state.usdt = f"{usdt:.6f}"
+        st.session_state.btc = f"{btc:.8f}"
+        st.session_state.sats = f"{sats:.2f}"
+        st.session_state.c1 = f"{c1:.4f}"
+        st.session_state.c2 = f"{c2:.4f}"
 
-        # 输出计算后的结果
-        result_col = st.columns(6)
-        result_col[0].metric("CNY", round(cny, 6))
-        result_col[1].metric("USDT", round(usdt, 6))
-        result_col[2].metric("BTC", round(btc, 8))
-        result_col[3].metric("SATS", round(sats, 2))
-        result_col[4].metric(custom_name1, round(c1, 4))
-        result_col[5].metric(custom_name2, round(c2, 4))
+    except:
+        pass
 
-    # 自动刷新
     time.sleep(refresh_interval)
     st.rerun()
