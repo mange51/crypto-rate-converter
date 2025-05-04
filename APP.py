@@ -1,26 +1,63 @@
+import streamlit as st
 import requests
+import time
 
-def get_rate_with_headers():
-    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=cny"
+st.set_page_config(page_title="BTC/USDT 汇率", layout="centered")
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                      "(KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "zh-CN,zh;q=0.9",
-        "Referer": "https://www.coingecko.com/"
-    }
+st.title("📈 BTC 与 USDT 汇率查询")
+st.markdown("使用 OKX 与火币接口，支持实时刷新。")
 
+# 数据源选项
+source = st.selectbox("选择汇率来源", ["OKX", "火币"])
+
+# 自动刷新
+auto_refresh = st.checkbox("每 60 秒自动刷新", value=False)
+
+# 显示加载状态
+status = st.empty()
+
+@st.cache_data(ttl=60)
+def get_okx_rates():
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            cny_rate = data["bitcoin"]["cny"]
-            print(f"当前比特币兑人民币汇率：¥{cny_rate}")
-        else:
-            print(f"获取汇率失败，状态码：{response.status_code}\n内容：{response.text}")
-    except requests.RequestException as e:
-        print(f"请求异常：{e}")
+        btc_resp = requests.get("https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT").json()
+        btc_price = float(btc_resp["data"][0]["last"])
+        cny_resp = requests.get("https://www.okx.com/api/v5/market/ticker?instId=USDT-CNY").json()
+        usdt_to_cny = float(cny_resp["data"][0]["last"])
+        return btc_price, usdt_to_cny
+    except:
+        return None, None
 
-if __name__ == "__main__":
-    get_rate_with_headers()
+@st.cache_data(ttl=60)
+def get_huobi_rates():
+    try:
+        btc_resp = requests.get("https://api.huobi.pro/market/detail/merged?symbol=btcusdt").json()
+        btc_price = float(btc_resp["tick"]["close"])
+        cny_resp = requests.get("https://api.huobi.pro/market/detail/merged?symbol=usdtcny").json()
+        usdt_to_cny = float(cny_resp["tick"]["close"])
+        return btc_price, usdt_to_cny
+    except:
+        return None, None
+
+# 主循环
+def display_rates():
+    if source == "OKX":
+        btc, usdt = get_okx_rates()
+    else:
+        btc, usdt = get_huobi_rates()
+
+    if btc is None or usdt is None:
+        st.error("❌ 获取汇率失败，请稍后再试。")
+    else:
+        st.success("✅ 汇率获取成功")
+        st.metric("BTC/USDT", f"{btc:.2f} USDT")
+        st.metric("USDT/CNY", f"{usdt:.2f} 元")
+        st.metric("BTC/CNY", f"{btc * usdt:.2f} 元")
+
+# 自动刷新逻辑
+if auto_refresh:
+    while True:
+        display_rates()
+        time.sleep(60)
+        st.rerun()
+else:
+    display_rates()
