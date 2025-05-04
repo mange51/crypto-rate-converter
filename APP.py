@@ -4,11 +4,7 @@ import requests
 st.set_page_config(page_title="BTC 汇率查询 - 第8版", layout="centered")
 st.title("💱 BTC 汇率查询 - 第8版")
 
-# 平台选项
-platforms = ["Binance", "火币 (Huobi)"]
-platform = st.selectbox("选择数据平台：", platforms)
-
-# 网络连接检测
+# 网络连接检测（访问 Google）
 def check_network():
     try:
         requests.get("https://www.google.com", timeout=5)
@@ -16,68 +12,71 @@ def check_network():
     except:
         return False
 
-# 获取人民币兑美元汇率（即 USD/CNY）
+# 显示网络状态
+if check_network():
+    st.success("🌐 网络连接正常（已连接 Google）")
+else:
+    st.error("❌ 网络连接失败，无法访问 Google")
+
+# 获取币安 BTC/USDT 汇率
+def get_binance_btc_usdt():
+    try:
+        url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+        resp = requests.get(url, timeout=5)
+        resp.raise_for_status()
+        price = float(resp.json()['price'])
+        return price, "✅ Binance 成功"
+    except Exception as e:
+        return None, f"❌ Binance 失败：{e}"
+
+# 获取火币 BTC/USDT 汇率
+def get_huobi_btc_usdt():
+    try:
+        url = "https://api.huobi.pro/market/detail/merged?symbol=btcusdt"
+        resp = requests.get(url, timeout=5)
+        resp.raise_for_status()
+        price = float(resp.json()['tick']['close'])
+        return price, "✅ 火币 成功"
+    except Exception as e:
+        return None, f"❌ 火币 失败：{e}"
+
+# 获取 USD/CNY 汇率（使用 exchangerate.host）
 def get_usd_cny_rate():
     try:
         url = "https://api.exchangerate.host/latest?base=USD&symbols=CNY"
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-        usd_cny = float(response.json()["rates"]["CNY"])
-        return usd_cny, "✅ 获取 USD/CNY 成功"
+        resp = requests.get(url, timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
+        return float(data['rates']['CNY']), "✅ USD/CNY 获取成功"
     except Exception as e:
-        return None, f"❌ 获取 USD/CNY 失败：{e}"
+        return None, f"❌ USD/CNY 获取失败：{e}"
 
-# 获取 Binance BTC/USDT 汇率
-def get_binance_rate():
-    try:
-        url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-        btc_usdt = float(response.json()["price"])
-        return btc_usdt, "✅ Binance 获取成功"
-    except Exception as e:
-        return None, f"❌ Binance 获取失败：{e}"
+st.subheader("📊 汇率查询")
 
-# 获取火币 BTC/USDT 汇率
-def get_huobi_rate():
-    try:
-        url = "https://api.huobi.pro/market/detail/merged?symbol=btcusdt"
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-        btc_usdt = float(response.json()["tick"]["close"])
-        return btc_usdt, "✅ 火币 获取成功"
-    except Exception as e:
-        return None, f"❌ 火币 获取失败：{e}"
+platform = st.selectbox("选择平台：", ["Binance", "火币 (Huobi)"])
 
-# 汇率获取逻辑
-def get_rates(platform):
+if st.button("获取 BTC 和 USD/CNY 汇率"):
     if platform == "Binance":
-        return get_binance_rate()
-    elif platform == "火币 (Huobi)":
-        return get_huobi_rate()
+        btc_usdt, status = get_binance_btc_usdt()
     else:
-        return None, "❌ 未知平台"
+        btc_usdt, status = get_huobi_btc_usdt()
 
-# 主按钮逻辑
-if st.button("获取汇率"):
-    if check_network():
-        st.success("🌐 网络连接正常（已连接Google）")
+    usd_cny, cny_status = get_usd_cny_rate()
 
-        btc_usdt, status1 = get_rates(platform)
-        usd_cny, status2 = get_usd_cny_rate()
-
-        if btc_usdt and usd_cny:
-            btc_cny = btc_usdt * usd_cny
-            st.write(status1)
-            st.write(status2)
-            st.write(f"🔶 当前 BTC/USDT 汇率：`{btc_usdt}`")
-            st.write(f"💵 当前 USD/CNY 汇率：`{usd_cny}`")
-            st.write(f"💰 当前 BTC/CNY 汇率：`{btc_cny:.2f}`")
-        else:
-            st.error("获取汇率失败，请稍后再试。")
-            st.write(status1)
-            st.write(status2)
+    if btc_usdt:
+        st.write(status)
+        st.write(f"🔶 BTC/USDT 汇率：`{btc_usdt}`")
     else:
-        st.error("❌ 无法访问 Google，可能断网或被墙。")
+        st.error("无法获取 BTC 汇率")
+        st.write(status)
 
-st.caption("© 第8版 - 支持 Binance 和火币，自动获取 USD/CNY 汇率")
+    if usd_cny:
+        st.write(cny_status)
+        st.write(f"💵 USD/CNY 汇率：`{usd_cny}`")
+        if btc_usdt:
+            st.write(f"💰 BTC/CNY 汇率：`{btc_usdt * usd_cny:.2f}`")
+    else:
+        st.error("无法获取 USD/CNY 汇率")
+        st.write(cny_status)
+
+st.caption("© 第8版 - Binance / 火币 BTC 汇率 + 实时 USD/CNY 汇率")
