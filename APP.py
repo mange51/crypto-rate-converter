@@ -3,8 +3,8 @@ import requests
 import time
 from datetime import datetime
 
-st.set_page_config(page_title="币种换算器 第8.6版", layout="centered")
-st.title("💱 币种换算器（第8.6版）")
+st.set_page_config(page_title="币种换算器 第8.7版", layout="centered")
+st.title("💱 币种换算器（第8.7版）")
 
 # 检查网络连接
 def check_network():
@@ -38,6 +38,13 @@ def get_usd_to_cny():
     except:
         return None
 
+# 千位格式 + 自适应精度（自动去除多余小数）
+def format_number(value, max_decimals=8):
+    if value == int(value):
+        return f"{int(value):,}"
+    else:
+        return f"{value:,.{max_decimals}f}".rstrip("0").rstrip(".")
+
 # 汇率源选择
 source = st.selectbox("选择汇率平台", ["Binance", "Huobi"])
 
@@ -62,19 +69,16 @@ if check_network():
     # DeFAI价格
     defai_price = st.number_input("DeFAI 单价（聪）", min_value=1.0, value=100.0, step=1.0)
 
-    # 用户输入方式
     st.subheader("输入一个币种数值，其它币种将自动换算")
 
     input_option = st.radio("选择输入币种", ["CNY", "USDT", "BTC", "SATS", "DeFAI"], horizontal=True)
-
-    # 改进输入体验：使用 text_input + 转换，避免默认值 + 回车问题
     raw_input = st.text_input(f"请输入 {input_option} 数值", value="", placeholder="请输入数值…")
+
     try:
         user_input = float(raw_input.replace(",", ""))
     except:
         user_input = 0.0
 
-    # 初始化换算结果
     cny = usdt = btc = sats = defai = 0.0
 
     if btc_usdt and usd_to_cny and user_input > 0:
@@ -105,15 +109,13 @@ if check_network():
         sats = btc * 100_000_000
         defai = sats / defai_price if defai_price > 0 else 0
 
-        # 显示换算结果（只读 + 千位符格式）
         st.markdown("### 💹 换算结果")
         cols = st.columns(5)
-        cols[0].text_input("CNY（人民币）", value=f"{cny:,.6f}", disabled=True)
-        cols[1].text_input("USDT（美元）", value=f"{usdt:,.6f}", disabled=True)
-        cols[2].text_input("BTC（比特币）", value=f"{btc:,.8f}", disabled=True)
-        cols[3].text_input("SATS（聪）", value=f"{sats:,.2f}", disabled=True)
-        cols[4].text_input("DeFAI", value=f"{defai:,.4f}", disabled=True)
+        cols[0].text_input("CNY（人民币）", value=format_number(cny, 6), disabled=True)
+        cols[1].text_input("USDT（美元）", value=format_number(usdt, 6), disabled=True)
+        cols[2].text_input("BTC（比特币）", value=format_number(btc, 8), disabled=True)
+        cols[3].text_input("SATS（聪）", value=format_number(sats, 2), disabled=True)
+        cols[4].text_input("DeFAI", value=format_number(defai, 4), disabled=True)
 
-    # 自动刷新
     time.sleep(refresh_interval)
     st.rerun()
