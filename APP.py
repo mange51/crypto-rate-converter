@@ -3,8 +3,8 @@ import requests
 import time
 from datetime import datetime
 
-st.set_page_config(page_title="币种换算器 第8.5版", layout="centered")
-st.title("💱 币种换算器（第8.5版）")
+st.set_page_config(page_title="币种换算器 第8.6版", layout="centered")
+st.title("💱 币种换算器（第8.6版）")
 
 # 检查网络连接
 def check_network():
@@ -67,7 +67,12 @@ if check_network():
 
     input_option = st.radio("选择输入币种", ["CNY", "USDT", "BTC", "SATS", "DeFAI"], horizontal=True)
 
-    user_input = st.number_input(f"请输入 {input_option} 数值", min_value=0.0, value=0.0, step=0.01, format="%.8f")
+    # 改进输入体验：使用 text_input + 转换，避免默认值 + 回车问题
+    raw_input = st.text_input(f"请输入 {input_option} 数值", value="", placeholder="请输入数值…")
+    try:
+        user_input = float(raw_input.replace(",", ""))
+    except:
+        user_input = 0.0
 
     # 初始化换算结果
     cny = usdt = btc = sats = defai = 0.0
@@ -100,14 +105,14 @@ if check_network():
         sats = btc * 100_000_000
         defai = sats / defai_price if defai_price > 0 else 0
 
-        # 显示换算结果（只读）
+        # 显示换算结果（只读 + 千位符格式）
         st.markdown("### 💹 换算结果")
         cols = st.columns(5)
-        cols[0].text_input("CNY（人民币）", value=round(cny, 6), disabled=True)
-        cols[1].text_input("USDT（美元）", value=round(usdt, 6), disabled=True)
-        cols[2].text_input("BTC（比特币）", value=round(btc, 8), disabled=True)
-        cols[3].text_input("SATS（聪）", value=round(sats, 2), disabled=True)
-        cols[4].text_input("DeFAI", value=round(defai, 4), disabled=True)
+        cols[0].text_input("CNY（人民币）", value=f"{cny:,.6f}", disabled=True)
+        cols[1].text_input("USDT（美元）", value=f"{usdt:,.6f}", disabled=True)
+        cols[2].text_input("BTC（比特币）", value=f"{btc:,.8f}", disabled=True)
+        cols[3].text_input("SATS（聪）", value=f"{sats:,.2f}", disabled=True)
+        cols[4].text_input("DeFAI", value=f"{defai:,.4f}", disabled=True)
 
     # 自动刷新
     time.sleep(refresh_interval)
