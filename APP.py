@@ -6,149 +6,123 @@ from datetime import datetime
 st.set_page_config(page_title="加密货币转换器 第8.6版", layout="centered")
 st.title("💱 加密货币转换器 第8.6版")
 
-# 检查网络连接
+# 网络检测
 def check_network():
     try:
         requests.get("https://www.google.com", timeout=5)
-        st.success("🌐 网络连接正常（可以访问 Google）")
+        st.success("🌐 网络连接正常")
         return True
     except:
-        st.error("❌ 无法连接外网，请检查代理或网络设置。")
+        st.error("❌ 无法连接外网")
         return False
 
-# 获取 BTC/USDT 汇率
+# 汇率获取
 @st.cache_data(ttl=60)
 def get_btc_usdt(source):
     try:
         if source == "Binance":
             url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
-            r = requests.get(url).json()
-            return float(r['price'])
+            return float(requests.get(url).json()['price'])
         elif source == "Huobi":
             url = "https://api.huobi.pro/market/detail/merged?symbol=btcusdt"
-            r = requests.get(url).json()
-            return float(r['tick']['close'])
+            return float(requests.get(url).json()['tick']['close'])
     except:
         return None
 
-# 获取 USD 对 CNY 汇率
 @st.cache_data(ttl=600)
 def get_usd_to_cny():
     try:
         url = "https://open.er-api.com/v6/latest/USD"
-        r = requests.get(url).json()
-        return r['rates']['CNY']
+        return requests.get(url).json()['rates']['CNY']
     except:
         return None
 
-# 汇率来源选择
 source = st.selectbox("选择汇率平台", ["Binance", "Huobi"])
 
 if check_network():
     btc_usdt = get_btc_usdt(source)
     usd_to_cny = get_usd_to_cny()
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    if btc_usdt:
-        st.success(f"{source} BTC/USDT 汇率: {btc_usdt}")
-    else:
-        st.error("❌ 获取 BTC/USDT 汇率失败")
+    if btc_usdt: st.success(f"{source} BTC/USDT: {btc_usdt}")
+    else: st.error("❌ 获取 BTC/USDT 失败")
 
-    if usd_to_cny:
-        st.success(f"USD/CNY 汇率: {usd_to_cny:.4f}（{timestamp}）")
-    else:
-        st.error("❌ 获取 USD/CNY 汇率失败")
+    if usd_to_cny: st.success(f"USD/CNY: {usd_to_cny:.4f}（{now}）")
+    else: st.error("❌ 获取 USD/CNY 失败")
 
-    refresh_interval = st.number_input("设置自动刷新时间（秒）", min_value=5, max_value=3600, value=60, step=5)
+    refresh_interval = st.number_input("自动刷新时间（秒）", 5, 3600, 60, 5)
     st.markdown("---")
 
-    # 自定义币种
-    custom_name1 = st.text_input("自定义币种 1 名称", value="自定义币1")
-    custom_price1 = st.number_input(f"{custom_name1} 单价（聪）", min_value=0.0, value=100.0)
-    custom_name2 = st.text_input("自定义币种 2 名称", value="自定义币2")
-    custom_price2 = st.number_input(f"{custom_name2} 单价（聪）", min_value=0.0, value=200.0)
+    # 自定义币
+    cname1 = st.text_input("自定义币种1 名称", value="自定义币1")
+    price1 = st.number_input(f"{cname1} 单价（聪）", value=100.0, min_value=0.0)
+    cname2 = st.text_input("自定义币种2 名称", value="自定义币2")
+    price2 = st.number_input(f"{cname2} 单价（聪）", value=200.0, min_value=0.0)
 
     st.markdown("---")
-    st.subheader("输入任意一个币种，自动换算其余")
+    st.subheader("输入一个币种，其余自动换算")
 
-    # 输入栏并记录来源
     input_col = st.columns(6)
-    input_sources = {}
-    cny_input = input_col[0].text_input("CNY（人民币）", value="", key="cny_input")
-    usdt_input = input_col[1].text_input("USD/T（美元/泰达）", value="", key="usdt_input")
-    btc_input = input_col[2].text_input("BTC（比特币）", value="", key="btc_input")
-    sats_input = input_col[3].text_input("SATS（聪）", value="", key="sats_input")
-    c1_input = input_col[4].text_input(custom_name1, value="", key="c1_input")
-    c2_input = input_col[5].text_input(custom_name2, value="", key="c2_input")
+    fields = ["cny", "usdt", "btc", "sats", "c1", "c2"]
+    labels = ["CNY", "USDT", "BTC", "SATS", cname1, cname2]
 
-    results = {"cny": "", "usdt": "", "btc": "", "sats": "", "c1": "", "c2": ""}
+    inputs = {}
+    for i, field in enumerate(fields):
+        with input_col[i]:
+            inputs[field] = st.text_input(labels[i], value="", key=f"input_{field}")
 
-    try:
-        if cny_input:
-            cny = float(cny_input)
-            usdt = cny / usd_to_cny
-            btc = usdt / btc_usdt
-            sats = btc * 100_000_000
-            c1 = sats / custom_price1 if custom_price1 > 0 else 0
-            c2 = sats / custom_price2 if custom_price2 > 0 else 0
-            results.update({"cny": cny_input, "usdt": f"{usdt:.6f}", "btc": f"{btc:.8f}", "sats": f"{sats:.2f}", "c1": f"{c1:.4f}", "c2": f"{c2:.4f}"})
+    # 识别第一个有效输入
+    active_key, active_value = None, None
+    for k in fields:
+        v = inputs[k]
+        if v.strip() != "":
+            try:
+                active_value = float(v)
+                active_key = k
+                break
+            except:
+                continue
 
-        elif usdt_input:
-            usdt = float(usdt_input)
-            btc = usdt / btc_usdt
-            cny = usdt * usd_to_cny
-            sats = btc * 100_000_000
-            c1 = sats / custom_price1 if custom_price1 > 0 else 0
-            c2 = sats / custom_price2 if custom_price2 > 0 else 0
-            results.update({"cny": f"{cny:.6f}", "usdt": usdt_input, "btc": f"{btc:.8f}", "sats": f"{sats:.2f}", "c1": f"{c1:.4f}", "c2": f"{c2:.4f}"})
+    results = dict.fromkeys(fields, 0.0)
+    if active_key and btc_usdt and usd_to_cny:
+        if active_key == "cny":
+            results["cny"] = active_value
+            results["usdt"] = active_value / usd_to_cny
+            results["btc"] = results["usdt"] / btc_usdt
+        elif active_key == "usdt":
+            results["usdt"] = active_value
+            results["btc"] = active_value / btc_usdt
+            results["cny"] = active_value * usd_to_cny
+        elif active_key == "btc":
+            results["btc"] = active_value
+            results["usdt"] = active_value * btc_usdt
+            results["cny"] = results["usdt"] * usd_to_cny
+        elif active_key == "sats":
+            results["btc"] = active_value / 100_000_000
+            results["usdt"] = results["btc"] * btc_usdt
+            results["cny"] = results["usdt"] * usd_to_cny
+        elif active_key == "c1":
+            sats = active_value * price1
+            results["btc"] = sats / 100_000_000
+            results["usdt"] = results["btc"] * btc_usdt
+            results["cny"] = results["usdt"] * usd_to_cny
+        elif active_key == "c2":
+            sats = active_value * price2
+            results["btc"] = sats / 100_000_000
+            results["usdt"] = results["btc"] * btc_usdt
+            results["cny"] = results["usdt"] * usd_to_cny
 
-        elif btc_input:
-            btc = float(btc_input)
-            usdt = btc * btc_usdt
-            cny = usdt * usd_to_cny
-            sats = btc * 100_000_000
-            c1 = sats / custom_price1 if custom_price1 > 0 else 0
-            c2 = sats / custom_price2 if custom_price2 > 0 else 0
-            results.update({"cny": f"{cny:.6f}", "usdt": f"{usdt:.6f}", "btc": btc_input, "sats": f"{sats:.2f}", "c1": f"{c1:.4f}", "c2": f"{c2:.4f}"})
+        results["sats"] = results["btc"] * 100_000_000
+        results["c1"] = results["sats"] / price1 if price1 else 0
+        results["c2"] = results["sats"] / price2 if price2 else 0
 
-        elif sats_input:
-            sats = float(sats_input)
-            btc = sats / 100_000_000
-            usdt = btc * btc_usdt
-            cny = usdt * usd_to_cny
-            c1 = sats / custom_price1 if custom_price1 > 0 else 0
-            c2 = sats / custom_price2 if custom_price2 > 0 else 0
-            results.update({"cny": f"{cny:.6f}", "usdt": f"{usdt:.6f}", "btc": f"{btc:.8f}", "sats": sats_input, "c1": f"{c1:.4f}", "c2": f"{c2:.4f}"})
+        output_col = st.columns(6)
+        for i, field in enumerate(fields):
+            with output_col[i]:
+                if field != active_key:
+                    st.text_input(labels[i], value=str(round(results[field], 6)), key=f"output_{field}", disabled=True)
 
-        elif c1_input:
-            c1 = float(c1_input)
-            sats = c1 * custom_price1
-            btc = sats / 100_000_000
-            usdt = btc * btc_usdt
-            cny = usdt * usd_to_cny
-            c2 = sats / custom_price2 if custom_price2 > 0 else 0
-            results.update({"cny": f"{cny:.6f}", "usdt": f"{usdt:.6f}", "btc": f"{btc:.8f}", "sats": f"{sats:.2f}", "c1": c1_input, "c2": f"{c2:.4f}"})
-
-        elif c2_input:
-            c2 = float(c2_input)
-            sats = c2 * custom_price2
-            btc = sats / 100_000_000
-            usdt = btc * btc_usdt
-            cny = usdt * usd_to_cny
-            c1 = sats / custom_price1 if custom_price1 > 0 else 0
-            results.update({"cny": f"{cny:.6f}", "usdt": f"{usdt:.6f}", "btc": f"{btc:.8f}", "sats": f"{sats:.2f}", "c1": f"{c1:.4f}", "c2": c2_input})
-
-    except:
-        pass
-
-    # 结果展示栏
-    result_col = st.columns(6)
-    result_col[0].text_input("CNY（人民币）", value=results["cny"], key="cny_result")
-    result_col[1].text_input("USD/T（美元/泰达）", value=results["usdt"], key="usdt_result")
-    result_col[2].text_input("BTC（比特币）", value=results["btc"], key="btc_result")
-    result_col[3].text_input("SATS（聪）", value=results["sats"], key="sats_result")
-    result_col[4].text_input(custom_name1, value=results["c1"], key="c1_result")
-    result_col[5].text_input(custom_name2, value=results["c2"], key="c2_result")
+    st.caption(f"最后更新：{now}（每 {refresh_interval} 秒刷新一次）")
 
     time.sleep(refresh_interval)
     st.rerun()
