@@ -1,126 +1,137 @@
+# app.py - 第9.0版：结构优化 + UI调整 + 千位符 + 完整换算逻辑
+
 import streamlit as st
 import requests
 import time
 from datetime import datetime
 
-st.set_page_config(page_title="币种换算器 第8.9版", layout="centered")
-st.title("💱 币种换算器（第8.9版）")
+st.set_page_config(page_title="币种换算器", layout="centered")
 
-# 检查网络连接
-def check_network():
-    try:
-        requests.get("https://www.google.com", timeout=5)
-        st.success("🌐 网络连接正常（已连接 Google）")
-        return True
-    except:
-        st.error("❌ 无法连接外网")
-        return False
+# 初始化 session_state
+for key in ["selected_currency", "input_amount", "defai_price_sats"]:
+    if key not in st.session_state:
+        st.session_state[key] = ""
 
-# 获取 BTC/USDT
+# ---------------------- 获取汇率函数 ----------------------
 @st.cache_data(ttl=60)
-def get_btc_usdt(source):
+def get_rates():
     try:
-        if source == "Binance":
-            r = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT").json()
-            return float(r['price']), datetime.now()
-        elif source == "Huobi":
-            r = requests.get("https://api.huobi.pro/market/detail/merged?symbol=btcusdt").json()
-            return float(r['tick']['close']), datetime.now()
-    except:
-        return None, None
+        # 获取 BTC/USDT 汇率（使用币安）
+        binance_resp = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=5)
+        binance_data = binance_resp.json()
+        btc_usdt = float(binance_data["price"])
+        btc_usdt_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# 获取 USD/CNY 汇率
-@st.cache_data(ttl=600)
-def get_usd_to_cny():
-    try:
-        r = requests.get("https://open.er-api.com/v6/latest/USD").json()
-        return r['rates']['CNY'], datetime.now()
-    except:
-        return None, None
+        # 获取 USD/CNY 汇率（使用 exchangerate.host）
+        fx_resp = requests.get("https://api.exchangerate.host/latest?base=USD&symbols=CNY", timeout=5)
+        fx_data = fx_resp.json()
+        usd_cny = float(fx_data["rates"]["CNY"])
+        usd_cny_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# 格式化千位数 + 去除多余小数
-def format_number(value, max_decimals=8):
-    if value == int(value):
-        return f"{int(value):,}"
+        return {
+            "btc_usdt": btc_usdt,
+            "btc_usdt_time": btc_usdt_time,
+            "usd_cny": usd_cny,
+            "usd_cny_time": usd_cny_time
+        }
+    except Exception as e:
+        st.error(f"❌ 汇率获取失败：{e}")
+        return None
+
+rates = get_rates()
+if not rates:
+    st.stop()
+
+# ---------------------- 标题 ----------------------
+st.markdown("## 💱 一币输入，多币立算")
+st.caption(f"🕒 汇率更新时间 - BTC/USDT: {rates['btc_usdt_time']} | USD/CNY: {rates['usd_cny_time']}")
+
+# ---------------------- 常量 ----------------------
+BTC_USDT = rates["btc_usdt"]
+USD_CNY = rates["usd_cny"]
+SATOSHI_PER_BTC = 100_000_000
+
+# 默认 DeFAI 单价（单位为聪）
+if st.session_state["defai_price_sats"] == "":
+    st.session_state["defai_price_sats"] = 100.0
+
+# ---------------------- 币种输入 ----------------------
+currency_names = {
+    "cny": "CNY(人民币)",
+    "usdt": "USDT(美元)",
+    "btc": "BTC(比特币)",
+    "sats": "SATS(聪)",
+    "defai": "DeFAI"
+}
+selected = st.selectbox("选择要输入的币种", list(currency_names.keys()), format_func=lambda x: currency_names[x])
+
+input_val = st.number_input(
+    f"请输入 {currency_names[selected]} 数量",
+    min_value=0.0,
+    format="%.8f",
+    key="input_amount"
+)
+
+# ---------------------- DeFAI 单价输入 ----------------------
+defai_price_sats = st.number_input(
+    "DeFAI 单价：SATS(聪)",
+    min_value=0.0,
+    format="%.4f",
+    key="defai_price_sats"
+)
+
+# ---------------------- 换算逻辑 ----------------------
+def convert_all(selected, input_val, defai_price):
+    result = {}
+
+    if selected == "cny":
+        usdt = input_val / USD_CNY
+        btc = usdt / BTC_USDT
+    elif selected == "usdt":
+        usdt = input_val
+        btc = usdt / BTC_USDT
+    elif selected == "btc":
+        btc = input_val
+    elif selected == "sats":
+        btc = input_val / SATOSHI_PER_BTC
+    elif selected == "defai":
+        sats = input_val * defai_price
+        btc = sats / SATOSHI_PER_BTC
     else:
-        return f"{value:,.{max_decimals}f}".rstrip("0").rstrip(".")
+        return {}
 
-# 汇率源选择
-source = st.selectbox("选择汇率平台", ["Binance", "Huobi"])
+    sats = btc * SATOSHI_PER_BTC
+    usdt = btc * BTC_USDT
+    cny = usdt * USD_CNY
+    defai = sats / defai_price if defai_price != 0 else 0
 
-if check_network():
-    btc_usdt, btc_time = get_btc_usdt(source)
-    usd_to_cny, usd_time = get_usd_to_cny()
+    result["cny"] = cny
+    result["usdt"] = usdt
+    result["btc"] = btc
+    result["sats"] = sats
+    result["defai"] = defai
+    return result
 
-    if btc_usdt:
-        st.success(f"{source} BTC/USDT 汇率: {btc_usdt}（更新时间：{btc_time.strftime('%Y-%m-%d %H:%M:%S')}）")
+results = convert_all(selected, input_val, defai_price_sats)
+
+# ---------------------- 显示换算结果 ----------------------
+st.markdown("### 📊 换算结果")
+def fmt(val):
+    if val >= 1000:
+        return f"{val:,.4f}".rstrip("0").rstrip(".")
     else:
-        st.error("❌ 获取 BTC/USDT 汇率失败")
+        return f"{val:.8f}".rstrip("0").rstrip(".")
 
-    if usd_to_cny:
-        st.success(f"USD/CNY 汇率: {usd_to_cny:.4f}（更新时间：{usd_time.strftime('%Y-%m-%d %H:%M:%S')}）")
-    else:
-        st.error("❌ 获取 USD/CNY 汇率失败")
+for key in ["cny", "usdt", "btc", "sats", "defai"]:
+    if key != selected:
+        st.text_input(currency_names[key], value=fmt(results.get(key, 0)), disabled=True)
 
-    refresh_interval = st.number_input("设置自动刷新时间（秒）", min_value=10, max_value=3600, value=60, step=5)
-    st.markdown("---")
+# ---------------------- 底部设置 ----------------------
+with st.expander("⚙️ 设置"):
+    st.selectbox("汇率平台（当前固定为币安+exchangerate.host）", ["Binance + exchangerate.host"], index=0, disabled=True)
+    refresh = st.slider("自动刷新时间（秒）", 10, 300, 60)
+    st.caption("数据每次页面刷新或间隔时间后自动更新")
 
-    # ✅ 使用 text_input + 格式化避免小数尾部问题
-    defai_input = st.text_input("DeFAI 单价：SATS(聪)", value="100")
-    try:
-        defai_price = float(defai_input.replace(",", ""))
-        if defai_price < 0:
-            defai_price = 0.0
-    except:
-        defai_price = 100.0
-
-    st.subheader("输入一个币种数值，其它币种将自动换算")
-
-    input_option = st.radio("选择输入币种", ["CNY(人民币)", "USDT(美元)", "BTC(比特币)", "SATS(聪)", "DeFAI"], horizontal=True)
-    raw_input = st.text_input(f"请输入 {input_option} 数值", value="", placeholder="请输入数值…")
-
-    try:
-        user_input = float(raw_input.replace(",", ""))
-    except:
-        user_input = 0.0
-
-    cny = usdt = btc = sats = defai = 0.0
-
-    if btc_usdt and usd_to_cny and user_input > 0:
-        if input_option.startswith("CNY"):
-            cny = user_input
-            usdt = cny / usd_to_cny
-            btc = usdt / btc_usdt
-        elif input_option.startswith("USDT"):
-            usdt = user_input
-            btc = usdt / btc_usdt
-            cny = usdt * usd_to_cny
-        elif input_option.startswith("BTC"):
-            btc = user_input
-            usdt = btc * btc_usdt
-            cny = usdt * usd_to_cny
-        elif input_option.startswith("SATS"):
-            sats = user_input
-            btc = sats / 100_000_000
-            usdt = btc * btc_usdt
-            cny = usdt * usd_to_cny
-        elif input_option == "DeFAI":
-            defai = user_input
-            sats = defai * defai_price
-            btc = sats / 100_000_000
-            usdt = btc * btc_usdt
-            cny = usdt * usd_to_cny
-
-        sats = btc * 100_000_000
-        defai = sats / defai_price if defai_price > 0 else 0
-
-        st.markdown("### 💹 换算结果")
-        cols = st.columns(5)
-        cols[0].text_input("CNY(人民币)", value=format_number(cny, 6), disabled=True)
-        cols[1].text_input("USDT(美元)", value=format_number(usdt, 6), disabled=True)
-        cols[2].text_input("BTC(比特币)", value=format_number(btc, 8), disabled=True)
-        cols[3].text_input("SATS(聪)", value=format_number(sats, 2), disabled=True)
-        cols[4].text_input("DeFAI", value=format_number(defai, 4), disabled=True)
-
-    time.sleep(refresh_interval)
-    st.rerun()
+# ---------------------- 自动刷新 ----------------------
+time.sleep(0.1)
+st.experimental_rerun()
