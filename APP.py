@@ -5,8 +5,8 @@ import requests
 import time
 from datetime import datetime
 
-st.set_page_config(page_title="币种换算器 第8.9.2版", layout="centered")
-st.title("💱 币种换算器（第8.9.2版）")
+st.set_page_config(page_title="币种换算器", layout="centered")
+st.title("💱 币种换算器)
 
 # 汇率数据获取函数
 @st.cache_data(ttl=60)
