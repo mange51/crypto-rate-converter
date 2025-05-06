@@ -3,8 +3,8 @@ import requests
 import time
 from datetime import datetime
 
-st.set_page_config(page_title="币种换算器 第8.8版", layout="centered")
-st.title("💱 币种换算器（第8.8版）")
+st.set_page_config(page_title="币种换算器 第9.0版", layout="centered")
+st.title("💱 币种换算器（第9.0版）")
 
 # 检查网络连接
 def check_network():
@@ -38,7 +38,7 @@ def get_usd_to_cny():
     except:
         return None
 
-# 千位格式 + 自适应精度（自动去除多余小数）
+# 千位格式 + 自动去除多余小数
 def format_number(value, max_decimals=8):
     if value == int(value):
         return f"{int(value):,}"
@@ -66,12 +66,11 @@ if check_network():
     refresh_interval = st.number_input("设置自动刷新时间（秒）", min_value=10, max_value=3600, value=60, step=5)
     st.markdown("---")
 
-    # ✅ DeFAI价格，允许 < 1
-    defai_price = st.number_input("DeFAI 单价（聪）", min_value=0.00000001, value=100.0, step=1.0, format="%.8f")
+    defai_price = st.number_input("DeFAI 单价：SATS(聪)", min_value=0.00000001, value=100.0, step=1.0, format="%.8f")
 
     st.subheader("输入一个币种数值，其它币种将自动换算")
 
-    input_option = st.radio("选择输入币种", ["CNY", "USDT", "BTC", "SATS", "DeFAI"], horizontal=True)
+    input_option = st.radio("选择输入币种", ["CNY(人民币)", "USDT(美元)", "BTC(比特币)", "SATS(聪)", "DeFAI"], horizontal=True)
     raw_input = st.text_input(f"请输入 {input_option} 数值", value="", placeholder="请输入数值…")
 
     try:
@@ -82,19 +81,19 @@ if check_network():
     cny = usdt = btc = sats = defai = 0.0
 
     if btc_usdt and usd_to_cny and user_input > 0:
-        if input_option == "CNY":
+        if input_option.startswith("CNY"):
             cny = user_input
             usdt = cny / usd_to_cny
             btc = usdt / btc_usdt
-        elif input_option == "USDT":
+        elif input_option.startswith("USDT"):
             usdt = user_input
             btc = usdt / btc_usdt
             cny = usdt * usd_to_cny
-        elif input_option == "BTC":
+        elif input_option.startswith("BTC"):
             btc = user_input
             usdt = btc * btc_usdt
             cny = usdt * usd_to_cny
-        elif input_option == "SATS":
+        elif input_option.startswith("SATS"):
             sats = user_input
             btc = sats / 100_000_000
             usdt = btc * btc_usdt
@@ -111,10 +110,10 @@ if check_network():
 
         st.markdown("### 💹 换算结果")
         cols = st.columns(5)
-        cols[0].text_input("CNY（人民币）", value=format_number(cny, 6), disabled=True)
-        cols[1].text_input("USDT（美元）", value=format_number(usdt, 6), disabled=True)
-        cols[2].text_input("BTC（比特币）", value=format_number(btc, 8), disabled=True)
-        cols[3].text_input("SATS（聪）", value=format_number(sats, 2), disabled=True)
+        cols[0].text_input("CNY(人民币)", value=format_number(cny, 6), disabled=True)
+        cols[1].text_input("USDT(美元)", value=format_number(usdt, 6), disabled=True)
+        cols[2].text_input("BTC(比特币)", value=format_number(btc, 8), disabled=True)
+        cols[3].text_input("SATS(聪)", value=format_number(sats, 2), disabled=True)
         cols[4].text_input("DeFAI", value=format_number(defai, 4), disabled=True)
 
     time.sleep(refresh_interval)
