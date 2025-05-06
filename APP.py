@@ -65,12 +65,17 @@ if check_network():
     refresh_interval = st.number_input("设置自动刷新时间（秒）", min_value=10, max_value=3600, value=60, step=5)
     st.markdown("---")
 
-    # ✅ DeFAI 单价格式简化，移除多余 .0000
-    defai_price = st.number_input("DeFAI 单价：SATS(聪)", min_value=0.0, value=100.0, step=0.1, format="%.2f")
+    # ✅ 使用 text_input + 格式化避免小数尾部问题
+    defai_input = st.text_input("DeFAI 单价：SATS(聪)", value="100")
+    try:
+        defai_price = float(defai_input.replace(",", ""))
+        if defai_price < 0:
+            defai_price = 0.0
+    except:
+        defai_price = 100.0
 
     st.subheader("输入一个币种数值，其它币种将自动换算")
 
-    # ✅ 币种显示带中文名称
     input_option = st.radio("选择输入币种", ["CNY(人民币)", "USDT(美元)", "BTC(比特币)", "SATS(聪)", "DeFAI"], horizontal=True)
     raw_input = st.text_input(f"请输入 {input_option} 数值", value="", placeholder="请输入数值…")
 
@@ -117,6 +122,5 @@ if check_network():
         cols[3].text_input("SATS(聪)", value=format_number(sats, 2), disabled=True)
         cols[4].text_input("DeFAI", value=format_number(defai, 4), disabled=True)
 
-    # 自动刷新
     time.sleep(refresh_interval)
     st.rerun()
