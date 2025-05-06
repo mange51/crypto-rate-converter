@@ -3,8 +3,8 @@ import requests
 import time
 from datetime import datetime
 
-st.set_page_config(page_title="币种换算器 第8.7版", layout="centered")
-st.title("💱 币种换算器（第8.7版）")
+st.set_page_config(page_title="币种换算器 第8.8版", layout="centered")
+st.title("💱 币种换算器（第8.8版）")
 
 # 检查网络连接
 def check_network():
@@ -66,8 +66,8 @@ if check_network():
     refresh_interval = st.number_input("设置自动刷新时间（秒）", min_value=10, max_value=3600, value=60, step=5)
     st.markdown("---")
 
-    # DeFAI价格
-    defai_price = st.number_input("DeFAI 单价（聪）", min_value=1.0, value=100.0, step=1.0)
+    # ✅ DeFAI价格，允许 < 1
+    defai_price = st.number_input("DeFAI 单价（聪）", min_value=0.00000001, value=100.0, step=1.0, format="%.8f")
 
     st.subheader("输入一个币种数值，其它币种将自动换算")
 
