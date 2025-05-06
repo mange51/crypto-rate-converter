@@ -3,8 +3,8 @@ import requests
 import time
 from datetime import datetime
 
-st.set_page_config(page_title="币种换算器 第8.8版", layout="centered")
-st.title("💱 币种换算器（第8.8版）")
+st.set_page_config(page_title="币种换算器 第8.9版", layout="centered")
+st.title("💱 币种换算器（第8.9版）")
 
 # 检查网络连接
 def check_network():
@@ -65,12 +65,12 @@ if check_network():
     refresh_interval = st.number_input("设置自动刷新时间（秒）", min_value=10, max_value=3600, value=60, step=5)
     st.markdown("---")
 
-    # ✅ 修改为允许小于1的 DeFAI 单价，并格式化
-    defai_price = st.number_input("DeFAI 单价：SATS(聪)", min_value=0.0, value=100.0, step=0.1, format="%.4f")
+    # ✅ DeFAI 单价格式简化，移除多余 .0000
+    defai_price = st.number_input("DeFAI 单价：SATS(聪)", min_value=0.0, value=100.0, step=0.1, format="%.2f")
 
     st.subheader("输入一个币种数值，其它币种将自动换算")
 
-    # ✅ 修改币种标签
+    # ✅ 币种显示带中文名称
     input_option = st.radio("选择输入币种", ["CNY(人民币)", "USDT(美元)", "BTC(比特币)", "SATS(聪)", "DeFAI"], horizontal=True)
     raw_input = st.text_input(f"请输入 {input_option} 数值", value="", placeholder="请输入数值…")
 
@@ -117,5 +117,6 @@ if check_network():
         cols[3].text_input("SATS(聪)", value=format_number(sats, 2), disabled=True)
         cols[4].text_input("DeFAI", value=format_number(defai, 4), disabled=True)
 
+    # 自动刷新
     time.sleep(refresh_interval)
     st.rerun()
